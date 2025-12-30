@@ -18,13 +18,18 @@ interface LocationMarker {
   lng: number
 }
 
-export function WorkSection() {
+interface WorkSectionProps {
+  highlightedLocation?: { lat: number; lng: number; name: string } | null
+}
+
+export function WorkSection({ highlightedLocation }: WorkSectionProps) {
   const { ref, isVisible } = useReveal(0.3)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const userLocationMarkerRef = useRef<any>(null)
   const locationMarkersRef = useRef<any[]>([])
   const infoWindowsRef = useRef<any[]>([])
+  const highlightedMarkerRef = useRef<any>(null)
   const [isLoaded, setIsLoaded] = useState(false)
 
   // Mock 데이터: 병원과 약국
@@ -226,6 +231,119 @@ export function WorkSection() {
       infoWindowsRef.current.push(infoWindow)
     })
   }, [isVisible, isLoaded])
+
+  // highlightedLocation이 변경되면 해당 위치로 이동하고 강조 표시
+  useEffect(() => {
+    if (!mapInstanceRef.current || !window.naver || !highlightedLocation) return
+
+    // 지도 중심 이동
+    const location = new window.naver.maps.LatLng(highlightedLocation.lat, highlightedLocation.lng)
+    mapInstanceRef.current.setCenter(location)
+    mapInstanceRef.current.setZoom(17)
+
+    // 기존 강조 마커 제거
+    if (highlightedMarkerRef.current) {
+      highlightedMarkerRef.current.setMap(null)
+    }
+
+    // 강조 마커 추가 (더 크고 눈에 띄게)
+    const highlightIcon = {
+      content: `
+        <div style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          cursor: pointer;
+        ">
+          <div style="
+            width: 40px;
+            height: 40px;
+            background-color: #00AA00;
+            border: 4px solid #FFD700;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 0 4px rgba(255,215,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s infinite;
+          ">
+            <div style="
+              transform: rotate(45deg);
+              font-size: 20px;
+            ">💊</div>
+          </div>
+          <div style="
+            margin-top: 6px;
+            white-space: nowrap;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1f2937;
+            text-shadow: 2px 2px 4px rgba(255,255,255,0.9), -2px -2px 4px rgba(255,255,255,0.9);
+            background: rgba(255,255,255,0.9);
+            padding: 2px 8px;
+            border-radius: 4px;
+          ">${highlightedLocation.name}</div>
+        </div>
+      `,
+      anchor: new window.naver.maps.Point(20, 60),
+    }
+
+    highlightedMarkerRef.current = new window.naver.maps.Marker({
+      position: location,
+      map: mapInstanceRef.current,
+      title: highlightedLocation.name,
+      icon: highlightIcon,
+      zIndex: 200,
+    })
+
+    // InfoWindow 자동 열기
+    const infoContent = `
+      <div style="
+        padding: 12px;
+        min-width: 200px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      ">
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 8px;
+        ">
+          <span style="font-size: 20px;">💊</span>
+          <h3 style="
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+            color: #1f2937;
+          ">${highlightedLocation.name}</h3>
+        </div>
+        <div style="
+          font-size: 13px;
+          color: #6b7280;
+          line-height: 1.5;
+        ">
+          <p style="margin: 4px 0;">
+            <strong>유형:</strong> 약국
+          </p>
+          <p style="margin: 4px 0;">
+            <strong>위치:</strong> ${highlightedLocation.lat.toFixed(4)}, ${highlightedLocation.lng.toFixed(4)}
+          </p>
+        </div>
+      </div>
+    `
+
+    const highlightInfoWindow = new window.naver.maps.InfoWindow({
+      content: infoContent,
+      backgroundColor: "#ffffff",
+      borderColor: "#e5e7eb",
+      borderWidth: 1,
+      anchorSize: { width: 10, height: 10 },
+      pixelOffset: { x: 0, y: -10 },
+    })
+
+    highlightInfoWindow.open(mapInstanceRef.current, highlightedMarkerRef.current)
+  }, [highlightedLocation, isLoaded])
 
   // 내 위치 보기 버튼 클릭 핸들러
   const handleCurrentLocation = () => {
