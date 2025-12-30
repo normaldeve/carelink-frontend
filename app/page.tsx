@@ -125,7 +125,7 @@ export default function Home() {
       >
         <Shader className="h-full w-full">
           <Swirl
-            colorA="#f5f5dc"
+            colorA="#ff8c42"
             colorB="#22c55e"
             speed={0.8}
             detail={0.8}
@@ -140,7 +140,7 @@ export default function Home() {
           <ChromaFlow
             baseColor="#22c55e"
             upColor="#22c55e"
-            downColor="#f5f5dc"
+            downColor="#ff8c42"
             leftColor="#22c55e"
             rightColor="#22c55e"
             intensity={0.9}
