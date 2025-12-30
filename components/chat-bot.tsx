@@ -13,6 +13,7 @@ interface ChatMessage {
   hospitals?: Hospital[]
   selectedHospital?: Hospital
   availableTimes?: string[]
+  showPreviousChats?: boolean
 }
 
 interface ChatBotProps {
@@ -52,15 +53,15 @@ interface Hospital {
   availableTimes: { [date: string]: string[] }
 }
 
+interface PreviousChat {
+  id: string
+  date: string
+  preview: string
+  messages: ChatMessage[]
+}
+
 export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavigateToMaps }: ChatBotProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: "1",
-      text: `Hello ${userName}! I'm here to help you with your medical consultation. How can I assist you today?`,
-      sender: "bot",
-      timestamp: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputMessage, setInputMessage] = useState("")
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -68,6 +69,8 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [hasPreviousChats, setHasPreviousChats] = useState(false)
+  const [previousChats, setPreviousChats] = useState<PreviousChat[]>([])
 
   // Mock 예약 데이터
   const mockReservations: Reservation[] = [
@@ -174,6 +177,64 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
     },
   ]
 
+  // Mock 이전 대화 목록 데이터
+  const mockPreviousChats: { [key: string]: PreviousChat[] } = {
+    "홍길동-010-1234-5678": [
+      {
+        id: "chat-1",
+        date: "2024-01-10",
+        preview: "병원 예약 문의",
+        messages: [
+          {
+            id: "1",
+            text: `Hello ${userName}! I'm here to help you with your medical consultation.`,
+            sender: "bot",
+            timestamp: new Date("2024-01-10T10:00:00"),
+          },
+          {
+            id: "2",
+            text: "병원 예약",
+            sender: "user",
+            timestamp: new Date("2024-01-10T10:01:00"),
+          },
+          {
+            id: "3",
+            text: "예약 가능한 병원 목록입니다.",
+            sender: "bot",
+            timestamp: new Date("2024-01-10T10:01:30"),
+            hospitals: mockHospitals,
+          },
+        ],
+      },
+      {
+        id: "chat-2",
+        date: "2024-01-08",
+        preview: "약국 검색",
+        messages: [
+          {
+            id: "1",
+            text: `Hello ${userName}! How can I help you?`,
+            sender: "bot",
+            timestamp: new Date("2024-01-08T14:00:00"),
+          },
+          {
+            id: "2",
+            text: "약국 검색",
+            sender: "user",
+            timestamp: new Date("2024-01-08T14:01:00"),
+          },
+          {
+            id: "3",
+            text: "근처 약국 3곳을 찾았습니다.",
+            sender: "bot",
+            timestamp: new Date("2024-01-08T14:01:30"),
+            pharmacies: mockPharmacies,
+          },
+        ],
+      },
+    ],
+  }
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
@@ -185,6 +246,38 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
   useEffect(() => {
     inputRef.current?.focus()
   }, [])
+
+  // 이름과 전화번호로 이전 대화 확인
+  useEffect(() => {
+    if (userName && phoneNumber) {
+      const chatKey = `${userName}-${phoneNumber}`
+      const chats = mockPreviousChats[chatKey]
+      
+      if (chats && chats.length > 0) {
+        setHasPreviousChats(true)
+        setPreviousChats(chats)
+        setMessages([
+          {
+            id: "1",
+            text: `Hello ${userName}! 이전 대화 내역이 있습니다. 불러오시겠습니까?`,
+            sender: "bot",
+            timestamp: new Date(),
+            showPreviousChats: true,
+          },
+        ])
+      } else {
+        setHasPreviousChats(false)
+        setMessages([
+          {
+            id: "1",
+            text: `Hello ${userName}! I'm here to help you with your medical consultation. How can I assist you today?`,
+            sender: "bot",
+            timestamp: new Date(),
+          },
+        ])
+      }
+    }
+  }, [userName, phoneNumber])
 
   // 채팅 영역에 마우스가 있을 때 페이지 스크롤 방지
   useEffect(() => {
@@ -337,6 +430,45 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
               }`}
             >
               <p className="font-sans text-sm leading-relaxed whitespace-pre-wrap">{message.text}</p>
+              {message.showPreviousChats && previousChats.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="font-sans text-xs font-semibold text-foreground/80 mb-2">이전 대화 목록:</p>
+                  {previousChats.map((chat) => (
+                    <button
+                      key={chat.id}
+                      onClick={() => {
+                        setMessages(chat.messages)
+                        setHasPreviousChats(false)
+                      }}
+                      className="w-full text-left border border-foreground/20 rounded-lg p-3 hover:bg-foreground/5 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-sans text-xs font-semibold text-foreground">{chat.preview}</p>
+                          <p className="font-mono text-xs text-foreground/60 mt-1">{chat.date}</p>
+                        </div>
+                        <span className="text-xs text-foreground/60">→</span>
+                      </div>
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => {
+                      setMessages([
+                        {
+                          id: "1",
+                          text: `Hello ${userName}! I'm here to help you with your medical consultation. How can I assist you today?`,
+                          sender: "bot",
+                          timestamp: new Date(),
+                        },
+                      ])
+                      setHasPreviousChats(false)
+                    }}
+                    className="w-full text-center px-3 py-2 text-xs rounded border border-foreground/30 bg-transparent text-foreground/70 hover:border-foreground/50 hover:text-foreground transition-colors"
+                  >
+                    새 대화 시작하기
+                  </button>
+                </div>
+              )}
               {message.reservations && message.reservations.length > 0 && (
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full border-collapse text-xs">
