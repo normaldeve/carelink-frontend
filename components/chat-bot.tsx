@@ -10,6 +10,9 @@ interface ChatMessage {
   timestamp: Date
   reservations?: Reservation[]
   pharmacies?: Pharmacy[]
+  hospitals?: Hospital[]
+  selectedHospital?: Hospital
+  availableTimes?: string[]
 }
 
 interface ChatBotProps {
@@ -39,6 +42,16 @@ interface Pharmacy {
   distance: string
 }
 
+interface Hospital {
+  id: string
+  name: string
+  department: string
+  address: string
+  phone: string
+  availableDates: string[]
+  availableTimes: { [date: string]: string[] }
+}
+
 export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavigateToMaps }: ChatBotProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -53,6 +66,8 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const [selectedHospitalId, setSelectedHospitalId] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
   // Mock 예약 데이터
   const mockReservations: Reservation[] = [
@@ -79,6 +94,52 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
       date: "2024-01-18",
       time: "15:00",
       status: "예약취소",
+    },
+  ]
+
+  // Mock 병원 데이터 (예약 가능)
+  const mockHospitals: Hospital[] = [
+    {
+      id: "hospital-1",
+      name: "서울대학교병원",
+      department: "내과",
+      address: "서울특별시 종로구 대학로 101",
+      phone: "02-2072-2114",
+      availableDates: ["2024-01-15", "2024-01-16", "2024-01-17", "2024-01-18"],
+      availableTimes: {
+        "2024-01-15": ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+        "2024-01-16": ["09:00", "10:00", "11:00", "14:00", "15:00"],
+        "2024-01-17": ["09:00", "10:00", "14:00", "15:00", "16:00"],
+        "2024-01-18": ["09:00", "10:00", "11:00", "14:00"],
+      },
+    },
+    {
+      id: "hospital-2",
+      name: "세브란스병원",
+      department: "정형외과",
+      address: "서울특별시 서대문구 연세로 50-1",
+      phone: "02-2228-5800",
+      availableDates: ["2024-01-15", "2024-01-16", "2024-01-19", "2024-01-20"],
+      availableTimes: {
+        "2024-01-15": ["10:00", "11:00", "14:00", "15:00", "16:00"],
+        "2024-01-16": ["09:00", "10:00", "11:00", "14:00"],
+        "2024-01-19": ["09:00", "10:00", "14:00", "15:00"],
+        "2024-01-20": ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"],
+      },
+    },
+    {
+      id: "hospital-3",
+      name: "아산병원",
+      department: "소아과",
+      address: "서울특별시 송파구 올림픽로43길 88",
+      phone: "02-3010-3114",
+      availableDates: ["2024-01-15", "2024-01-17", "2024-01-18", "2024-01-19"],
+      availableTimes: {
+        "2024-01-15": ["09:00", "10:00", "11:00", "14:00", "15:00"],
+        "2024-01-17": ["09:00", "10:00", "14:00", "15:00", "16:00"],
+        "2024-01-18": ["09:00", "10:00", "11:00", "14:00", "15:00"],
+        "2024-01-19": ["09:00", "10:00", "11:00", "14:00"],
+      },
     },
   ]
 
@@ -177,6 +238,7 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
       let botResponse = ""
       let reservations: Reservation[] | undefined = undefined
       let pharmacies: Pharmacy[] | undefined = undefined
+      let hospitals: Hospital[] | undefined = undefined
       
       if (userInput.includes("예약 조회") || userInput.includes("예약조회") || userInput.includes("예약 확인")) {
         if (mockReservations.length === 0) {
@@ -185,6 +247,11 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
           botResponse = `총 ${mockReservations.length}건의 예약 내역이 있습니다.`
           reservations = mockReservations
         }
+      } else if (userInput.includes("병원 예약") || userInput.includes("병원예약") || userInput.includes("예약하기")) {
+        botResponse = "예약 가능한 병원 목록입니다. 원하시는 병원을 선택해주세요."
+        hospitals = mockHospitals
+        setSelectedHospitalId(null)
+        setSelectedDate(null)
       } else if (userInput.includes("약국") || userInput.includes("근처 약국") || userInput.includes("약국 조회")) {
         if (mockPharmacies.length === 0) {
           botResponse = "근처 약국을 찾을 수 없습니다."
@@ -203,6 +270,7 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
         timestamp: new Date(),
         reservations: reservations,
         pharmacies: pharmacies,
+        hospitals: hospitals,
       }
       setMessages((prev) => [...prev, botMessage])
       setIsTyping(false)
@@ -306,6 +374,114 @@ export function ChatBot({ userName, phoneNumber, onClose, onShowLocation, onNavi
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {message.hospitals && message.hospitals.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  <p className="font-sans text-xs font-semibold text-foreground/80 mb-2">예약 가능한 병원:</p>
+                  {message.hospitals.map((hospital) => (
+                    <div
+                      key={hospital.id}
+                      className="border border-foreground/20 rounded-lg p-3 hover:bg-foreground/5 transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-sans text-sm font-semibold text-foreground">{hospital.name}</h4>
+                          <p className="font-sans text-xs text-foreground/70 mt-1">{hospital.department}</p>
+                          <p className="font-mono text-xs text-foreground/60 mt-1">{hospital.address}</p>
+                        </div>
+                        <button
+                          onClick={() => {
+                            const selectedHospital = message.hospitals?.find((h) => h.id === hospital.id)
+                            if (selectedHospital) {
+                              setSelectedHospitalId(hospital.id)
+                              const firstDate = selectedHospital.availableDates[0]
+                              setSelectedDate(firstDate)
+                              
+                              const botMessage: ChatMessage = {
+                                id: (Date.now() + 1).toString(),
+                                text: `${hospital.name} ${hospital.department}를 선택하셨습니다. 예약 날짜를 선택해주세요.`,
+                                sender: "bot",
+                                timestamp: new Date(),
+                                selectedHospital: selectedHospital,
+                              }
+                              setMessages((prev) => [...prev, botMessage])
+                            }
+                          }}
+                          className="px-3 py-1.5 text-xs rounded bg-foreground/10 hover:bg-foreground/20 text-foreground transition-colors whitespace-nowrap"
+                        >
+                          선택하기
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {message.selectedHospital && (
+                <div className="mt-3 space-y-3">
+                  <div className="border border-foreground/20 rounded-lg p-3">
+                    <h4 className="font-sans text-sm font-semibold text-foreground mb-3">
+                      {message.selectedHospital.name} - {message.selectedHospital.department}
+                    </h4>
+                    <p className="font-sans text-xs text-foreground/70 mb-3">예약 가능한 날짜:</p>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      {message.selectedHospital.availableDates.map((date) => {
+                        const dateObj = new Date(date)
+                        const formattedDate = `${dateObj.getMonth() + 1}/${dateObj.getDate()}`
+                        return (
+                          <button
+                            key={date}
+                            onClick={() => {
+                              setSelectedDate(date)
+                              const times = message.selectedHospital!.availableTimes[date] || []
+                              const botMessage: ChatMessage = {
+                                id: (Date.now() + 1).toString(),
+                                text: `${formattedDate}을 선택하셨습니다. 예약 시간을 선택해주세요.`,
+                                sender: "bot",
+                                timestamp: new Date(),
+                                selectedHospital: message.selectedHospital,
+                                availableTimes: times,
+                              }
+                              setMessages((prev) => [...prev, botMessage])
+                            }}
+                            className={`px-3 py-2 text-xs rounded border transition-colors ${
+                              selectedDate === date
+                                ? "bg-foreground/10 border-foreground/50 text-foreground"
+                                : "bg-transparent border-foreground/30 text-foreground/70 hover:border-foreground/50 hover:text-foreground"
+                            }`}
+                          >
+                            {formattedDate}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {message.availableTimes && message.availableTimes.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  <p className="font-sans text-xs font-semibold text-foreground/80 mb-2">예약 가능한 시간:</p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {message.availableTimes.map((time) => (
+                      <button
+                        key={time}
+                        onClick={() => {
+                          const botMessage: ChatMessage = {
+                            id: (Date.now() + 1).toString(),
+                            text: `${time} 시간으로 예약이 완료되었습니다! 예약 내역은 "예약 조회"를 통해 확인하실 수 있습니다.`,
+                            sender: "bot",
+                            timestamp: new Date(),
+                          }
+                          setMessages((prev) => [...prev, botMessage])
+                          setSelectedHospitalId(null)
+                          setSelectedDate(null)
+                        }}
+                        className="px-3 py-2 text-xs rounded border border-foreground/30 bg-transparent text-foreground/70 hover:border-foreground/50 hover:text-foreground hover:bg-foreground/5 transition-colors"
+                      >
+                        {time}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
               {message.pharmacies && message.pharmacies.length > 0 && (

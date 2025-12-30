@@ -14,23 +14,15 @@ export default function Home() {
   const [currentSection, setCurrentSection] = useState(0)
   const [isLoaded, setIsLoaded] = useState(false)
   const shaderContainerRef = useRef<HTMLDivElement>(null)
+  const [displayedText, setDisplayedText] = useState("")
+  const [isTyping, setIsTyping] = useState(false)
   
   // Consultation 기능을 위한 state
-  const [formData, setFormData] = useState({ name: "", phoneNumber: "", selectedService: "" })
+  const [formData, setFormData] = useState({ name: "", phoneNumber: "" })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showChatBot, setShowChatBot] = useState(false)
   const [highlightedLocation, setHighlightedLocation] = useState<{ lat: number; lng: number; name: string } | null>(null)
 
-  const services = [
-    "병원 예약",
-    "예약 조회",
-    "예약 취소",
-    "근처 약국 조회"
-  ]
-
-  const handleServiceSelect = (service: string) => {
-    setFormData({ ...formData, selectedService: service })
-  }
 
   const formatPhoneNumber = (value: string) => {
     const numbers = value.replace(/[^\d]/g, "")
@@ -51,7 +43,7 @@ export default function Home() {
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (!formData.name || !formData.phoneNumber || !formData.selectedService) {
+    if (!formData.name || !formData.phoneNumber) {
       return
     }
     setIsSubmitting(true)
@@ -89,6 +81,30 @@ export default function Home() {
       clearTimeout(fallbackTimer)
     }
   }, [])
+
+  // 타이핑 효과
+  useEffect(() => {
+    if (!isLoaded) return
+
+    const fullText = "Healthcare\njust a conversation"
+    let currentIndex = 0
+    setIsTyping(true)
+    setDisplayedText("")
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex < fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex + 1))
+        currentIndex++
+      } else {
+        setIsTyping(false)
+        clearInterval(typingInterval)
+      }
+    }, 80) // 각 글자마다 80ms 간격
+
+    return () => {
+      clearInterval(typingInterval)
+    }
+  }, [isLoaded])
 
   const scrollToSection = (index: number) => {
     setCurrentSection(index)
@@ -184,14 +200,13 @@ export default function Home() {
         {/* Hero Section */}
         <section className="flex min-h-screen w-screen shrink-0 items-center px-6 pb-16 pt-24 md:px-12 md:pb-24">
           <div className="mx-auto w-full max-w-7xl">
-            <div className="grid gap-8 md:grid-cols-[1.2fr_1fr] md:gap-16 lg:gap-24">
+            <div className="grid gap-8 md:grid-cols-[1fr_1.3fr] md:gap-16 lg:gap-24">
               {/* Left side - Hero content */}
               <div className="flex flex-col justify-center">
-                <h1 className="mb-6 animate-in fade-in slide-in-from-bottom-8 font-sans text-6xl font-light leading-[1.1] tracking-tight text-foreground duration-1000 md:text-7xl lg:text-8xl">
-                  <span>
-                    <strong>Healthcare</strong>
-                    <br />
-                    just a conversation
+                <h1 className="mb-6 font-sans text-6xl font-light leading-[1.1] tracking-tight text-foreground md:text-7xl lg:text-8xl">
+                  <span className="whitespace-pre-line">
+                    {displayedText}
+                    {isTyping && <span className="animate-pulse">|</span>}
                   </span>
                 </h1>
                 <p className="mb-8 max-w-xl animate-in fade-in slide-in-from-bottom-4 text-lg leading-relaxed text-foreground/90 duration-1000 delay-200 md:text-xl">
@@ -242,33 +257,13 @@ export default function Home() {
                     </div>
 
                     <div>
-                      <label className="mb-1 block font-mono text-xs text-foreground/60 md:mb-2">Service</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {services.map((service) => (
-                          <button
-                            key={service}
-                            type="button"
-                            onClick={() => handleServiceSelect(service)}
-                            className={`px-4 py-3 rounded-lg border transition-all duration-200 text-sm font-sans ${
-                              formData.selectedService === service
-                                ? "bg-foreground/10 border-foreground/50 text-foreground"
-                                : "bg-transparent border-foreground/30 text-foreground/70 hover:border-foreground/50 hover:text-foreground"
-                            }`}
-                          >
-                            {service}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
                       <MagneticButton
                         variant="primary"
                         size="lg"
                         className="w-full disabled:opacity-50"
                         disabled={isSubmitting}
                       >
-                        {isSubmitting ? "Sending..." : "Send Message"}
+                        {isSubmitting ? "Starting..." : "Start Consultation"}
                       </MagneticButton>
                     </div>
                   </form>
