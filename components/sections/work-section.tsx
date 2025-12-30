@@ -10,12 +10,40 @@ declare global {
   }
 }
 
+interface LocationMarker {
+  id: string
+  name: string
+  type: "hospital" | "pharmacy"
+  lat: number
+  lng: number
+}
+
 export function WorkSection() {
   const { ref, isVisible } = useReveal(0.3)
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<any>(null)
   const userLocationMarkerRef = useRef<any>(null)
+  const locationMarkersRef = useRef<any[]>([])
+  const infoWindowsRef = useRef<any[]>([])
   const [isLoaded, setIsLoaded] = useState(false)
+
+  // Mock 데이터: 병원과 약국
+  const mockLocations: LocationMarker[] = [
+    {
+      id: "hospital-1",
+      name: "서울대학교병원",
+      type: "hospital",
+      lat: 37.5665,
+      lng: 126.9780,
+    },
+    {
+      id: "pharmacy-1",
+      name: "건강약국",
+      type: "pharmacy",
+      lat: 37.5685,
+      lng: 126.9800,
+    },
+  ]
 
   const clientId = process.env.NEXT_PUBLIC_NAVER_MAP_CLIENT_ID || process.env.NEXT_PUBLIC_NAVER_MAP_KEY_ID || ""
   const scriptSrc = `https://oapi.map.naver.com/openapi/v3/maps.js?ncpKeyId=${clientId}`
@@ -62,7 +90,7 @@ export function WorkSection() {
     }
   }, [scriptSrc])
 
-  // 지도 초기화
+  // 지도 초기화 및 마커 표시
   useEffect(() => {
     if (!isVisible || !isLoaded || !mapRef.current || !window.naver || mapInstanceRef.current) return
 
@@ -75,6 +103,128 @@ export function WorkSection() {
     }
 
     mapInstanceRef.current = new window.naver.maps.Map(mapRef.current, mapOptions)
+
+    // 기존 마커 및 InfoWindow 제거
+    locationMarkersRef.current.forEach((marker) => marker.setMap(null))
+    locationMarkersRef.current = []
+    infoWindowsRef.current.forEach((infoWindow) => infoWindow.close())
+    infoWindowsRef.current = []
+
+    // Mock 데이터로 마커 생성
+    mockLocations.forEach((location) => {
+      const isHospital = location.type === "hospital"
+      const markerColor = isHospital ? "#FF0000" : "#00AA00" // 병원: 빨간색, 약국: 초록색
+      const iconSymbol = isHospital ? "🏥" : "💊"
+
+      const markerIcon = {
+        content: `
+          <div style="
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+          ">
+            <div style="
+              width: 30px;
+              height: 30px;
+              background-color: ${markerColor};
+              border: 2px solid white;
+              border-radius: 50% 50% 50% 0;
+              transform: rotate(-45deg);
+              box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+              display: flex;
+              align-items: center;
+              justify-content: center;
+            ">
+              <div style="
+                transform: rotate(45deg);
+                font-size: 16px;
+              ">${iconSymbol}</div>
+            </div>
+            <div style="
+              margin-top: 4px;
+              white-space: nowrap;
+              font-size: 12px;
+              font-weight: 600;
+              color: #1f2937;
+              text-shadow: 1px 1px 2px rgba(255,255,255,0.8), -1px -1px 2px rgba(255,255,255,0.8), 1px -1px 2px rgba(255,255,255,0.8), -1px 1px 2px rgba(255,255,255,0.8);
+              max-width: 120px;
+              overflow: hidden;
+              text-overflow: ellipsis;
+            ">${location.name}</div>
+          </div>
+        `,
+        anchor: new window.naver.maps.Point(15, 45),
+      }
+
+      const marker = new window.naver.maps.Marker({
+        position: new window.naver.maps.LatLng(location.lat, location.lng),
+        map: mapInstanceRef.current,
+        title: location.name,
+        icon: markerIcon,
+        zIndex: 100,
+      })
+
+      // InfoWindow 생성
+      const infoContent = `
+        <div style="
+          padding: 12px;
+          min-width: 200px;
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        ">
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+          ">
+            <span style="font-size: 20px;">${iconSymbol}</span>
+            <h3 style="
+              margin: 0;
+              font-size: 16px;
+              font-weight: 600;
+              color: #1f2937;
+            ">${location.name}</h3>
+          </div>
+          <div style="
+            font-size: 13px;
+            color: #6b7280;
+            line-height: 1.5;
+          ">
+            <p style="margin: 4px 0;">
+              <strong>유형:</strong> ${isHospital ? "병원" : "약국"}
+            </p>
+            <p style="margin: 4px 0;">
+              <strong>주소:</strong> 서울특별시 중구 세종대로 110
+            </p>
+            <p style="margin: 4px 0;">
+              <strong>전화:</strong> ${isHospital ? "02-2072-2114" : "02-1234-5678"}
+            </p>
+            ${isHospital ? '<p style="margin: 4px 0;"><strong>진료과:</strong> 내과, 외과, 소아과</p>' : '<p style="margin: 4px 0;"><strong>영업시간:</strong> 09:00 - 21:00</p>'}
+          </div>
+        </div>
+      `
+
+      const infoWindow = new window.naver.maps.InfoWindow({
+        content: infoContent,
+        backgroundColor: "#ffffff",
+        borderColor: "#e5e7eb",
+        borderWidth: 1,
+        anchorSize: { width: 10, height: 10 },
+        pixelOffset: { x: 0, y: -10 },
+      })
+
+      // 마커 클릭 이벤트
+      window.naver.maps.Event.addListener(marker, "click", () => {
+        // 다른 InfoWindow 닫기
+        infoWindowsRef.current.forEach((iw) => iw.close())
+        // 현재 InfoWindow 열기
+        infoWindow.open(mapInstanceRef.current, marker)
+      })
+
+      locationMarkersRef.current.push(marker)
+      infoWindowsRef.current.push(infoWindow)
+    })
   }, [isVisible, isLoaded])
 
   // 내 위치 보기 버튼 클릭 핸들러

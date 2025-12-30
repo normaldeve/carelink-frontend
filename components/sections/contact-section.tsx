@@ -22,6 +22,28 @@ export function ContactSection() {
     setFormData({ ...formData, selectedService: service })
   }
 
+  const formatPhoneNumber = (value: string) => {
+    // 숫자만 추출
+    const numbers = value.replace(/[^\d]/g, "")
+    
+    // 최대 11자리로 제한
+    const limitedNumbers = numbers.slice(0, 11)
+    
+    // 전화번호 포맷팅
+    if (limitedNumbers.length <= 3) {
+      return limitedNumbers
+    } else if (limitedNumbers.length <= 7) {
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(3)}`
+    } else {
+      return `${limitedNumbers.slice(0, 3)}-${limitedNumbers.slice(3, 7)}-${limitedNumbers.slice(7)}`
+    }
+  }
+
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatPhoneNumber(e.target.value)
+    setFormData({ ...formData, phoneNumber: formatted })
+  }
+
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
@@ -103,10 +125,11 @@ export function ContactSection() {
                   <input
                     type="tel"
                     value={formData.phoneNumber}
-                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
+                    onChange={handlePhoneNumberChange}
                     required
                     className="w-full border-b border-foreground/30 bg-transparent py-1.5 text-sm text-foreground placeholder:text-foreground/40 focus:border-foreground/50 focus:outline-none md:py-2 md:text-base"
                     placeholder="010-1234-5678"
+                    maxLength={13}
                   />
                 </div>
 
